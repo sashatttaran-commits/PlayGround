@@ -814,7 +814,8 @@ button:focus-visible {
   width: min(590px, 51vw);
   max-height: 100%;
   overflow: visible;
-  animation: start-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: none;
+  opacity: 1;
 }
 
 .start-content::-webkit-scrollbar { display: none; }
