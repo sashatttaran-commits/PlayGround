@@ -48,8 +48,10 @@
   const replayBtn = document.getElementById("replayBtn");
   const retryBtn = document.getElementById("retryBtn");
   const soundBtn = document.getElementById("soundBtn");
+  const leftBtn = document.getElementById("leftBtn");
+  const rightBtn = document.getElementById("rightBtn");
   const jumpBtn = document.getElementById("jumpBtn");
-  const dodgeBtn = document.getElementById("dodgeBtn");
+  const shootBtn = document.getElementById("shootBtn");
   const rebBtn = document.getElementById("rebBtn");
   const radioBtn = document.getElementById("radioBtn");
   const medBtn = document.getElementById("medBtn");
@@ -126,6 +128,8 @@
     menuDrone: { x: 0, y: 0, rotor: 0, bob: 0 },
   };
 
+  const input = { left: false, right: false, shoot: false };
+
   function playerHomeX() {
     return clamp(W * 0.21, 84, W * 0.26);
   }
@@ -139,15 +143,15 @@
       grounded: true,
       run: 0,
       invuln: 0,
-      dodge: 0,
-      dodgeCd: 0,
-      fireCd: 0.4,
+      shootCd: 0,
       muzzle: 0,
       aim: 0,
       hidden: false,
       dead: false,
       dustTimer: 0,
       boardPhase: 0,
+      moving: false,
+      vx: 0,
     };
   }
 
@@ -404,7 +408,28 @@
   }
 
   bindAction(jumpBtn, jump);
-  bindAction(dodgeBtn, dodge);
+
+  function setMove(dir, on) {
+    if (dir === "left") input.left = on;
+    if (dir === "right") input.right = on;
+  }
+  for (const [btn, dir] of [[leftBtn, "left"], [rightBtn, "right"]]) {
+    btn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      btn.classList.add("pressed");
+      setMove(dir, true);
+    });
+    btn.addEventListener("pointerup", () => { btn.classList.remove("pressed"); setMove(dir, false); });
+    btn.addEventListener("pointercancel", () => { btn.classList.remove("pressed"); setMove(dir, false); });
+    btn.addEventListener("pointerleave", () => { btn.classList.remove("pressed"); setMove(dir, false); });
+  }
+
+  bindAction(shootBtn, shoot);
+  shootBtn.addEventListener("pointerdown", () => { input.shoot = true; });
+  shootBtn.addEventListener("pointerup", () => { input.shoot = false; });
+  shootBtn.addEventListener("pointercancel", () => { input.shoot = false; });
+  shootBtn.addEventListener("pointerleave", () => { input.shoot = false; });
+
   bindAction(rebBtn, () => useAbility("reb"));
   bindAction(radioBtn, () => useAbility("radio"));
   bindAction(medBtn, () => useAbility("med"));
@@ -432,12 +457,20 @@
       startGame();
       return;
     }
-    if (code === "Space" || code === "ArrowUp" || code === "KeyW") jump();
-    else if (code === "ShiftLeft" || code === "ShiftRight" || code === "ArrowDown" || code === "KeyS") dodge();
+    if (code === "ArrowLeft" || code === "KeyA") input.left = true;
+    else if (code === "ArrowRight" || code === "KeyD") input.right = true;
+    else if (code === "Space" || code === "ArrowUp" || code === "KeyW") jump();
+    else if (code === "KeyF" || code === "KeyJ" || code === "Enter") shoot();
     else if (code === "Digit1") useAbility("reb");
     else if (code === "Digit2") useAbility("radio");
     else if (code === "Digit3") useAbility("med");
   }, { passive: false });
+
+  window.addEventListener("keyup", (e) => {
+    const code = e.code;
+    if (code === "ArrowLeft" || code === "KeyA") input.left = false;
+    else if (code === "ArrowRight" || code === "KeyD") input.right = false;
+  });
 
   // ---------- ability actions ----------
   function useAbility(key) {
@@ -545,6 +578,8 @@
     victoryScreen.setAttribute("aria-hidden", "true");
     deathScreen.classList.add("hidden");
     deathScreen.setAttribute("aria-hidden", "true");
+    canvas.style.display = "";
+    startScreen.style.backgroundImage = "";
     updateSoundButton();
     updateHud();
 
@@ -553,7 +588,7 @@
     spawnGroundEnemy(W * 0.97);
     spawnDrone(W * 0.62, H * 0.23);
     showObjective("REACH THE EXTRACTION POINT — 5 KM TO NOVATOR", 5600, "");
-    showToast("AUTO-RUN ENGAGED · AUTO-FIRE ONLINE", "good");
+    showToast("MANUAL CONTROLS ENGAGED · SHOOT TO CLEAR", "good");
   }
 
   function showVictory() {
@@ -688,7 +723,6 @@
       btn.setAttribute("aria-disabled", cooling ? "true" : "false");
     }
 
-    dodgeBtn.classList.toggle("cooldown", game.player && game.player.dodgeCd > 0.02);
   }
 
   function updateCooldowns(dt) {
@@ -703,14 +737,40 @@
     const p = game.player;
     if (!p) return;
     p.invuln = Math.max(0, p.invuln - dt);
-    p.dodge = Math.max(0, p.dodge - dt);
-    p.dodgeCd = Math.max(0, p.dodgeCd - dt);
     p.muzzle = Math.max(0, p.muzzle - dt);
-    p.fireCd -= dt;
+    p.shootCd = Math.max(0, p.shootCd - dt);
 
-    if (game.state === "playing" || game.state === "extraction") {
-      const running = p.grounded || game.state === "extraction";
-      if (running) p.run += dt * (game.state === "extraction" ? 13.5 : 12.5);
+    if (game.state === "playing") {
+      const moveSpeed = 260 * S;
+      let movingH = false;
+      if (input.left && !input.right) {
+        p.x = clamp(p.x - moveSpeed * dt, 60 * S, W - 60 * S);
+        movingH = true;
+        game.scroll -= moveSpeed * 0.5 * dt;
+      }
+      if (input.right && !input.left) {
+        p.x = clamp(p.x + moveSpeed * dt, 60 * S, W - 60 * S);
+        movingH = true;
+        if (game.distance > 0) {
+          game.scroll += moveSpeed * dt;
+          game.distance = Math.max(0, game.distance - moveSpeed * 0.12 * dt);
+        }
+      }
+      p.moving = movingH;
+      if (movingH) p.run += dt * 12.5;
+      p.dustTimer -= dt;
+      if (p.grounded && p.dustTimer <= 0 && movingH) {
+        p.dustTimer = rand(0.08, 0.16);
+        addParticle({
+          type: "dust", x: p.x - 7 * S, y: groundY - rand(1, 5),
+          vx: rand(-55, -22), vy: rand(-18, -4), size: rand(2.5, 6),
+          life: rand(0.25, 0.5), color: "145,132,108", layer: "fg",
+        });
+      }
+
+      if (input.shoot && p.shootCd <= 0) shoot();
+    } else {
+      p.moving = game.state === "extraction";
     }
 
     if (!p.grounded) {
@@ -721,21 +781,6 @@
         p.vy = 0;
         p.grounded = true;
         spawnDust(p.x, groundY, 5, 0.55);
-      }
-    }
-
-    if (game.state === "playing") {
-      if (p.fireCd <= 0) tryAutoFire();
-      p.dustTimer -= dt;
-      if (p.grounded && p.dustTimer <= 0) {
-        p.dustTimer = rand(0.08, 0.16);
-        if (game.speed > 0) {
-          addParticle({
-            type: "dust", x: p.x - 7 * S, y: groundY - rand(1, 5),
-            vx: rand(-55, -22), vy: rand(-18, -4), size: rand(2.5, 6),
-            life: rand(0.25, 0.5), color: "145,132,108", layer: "fg",
-          });
-        }
       }
     }
 
@@ -766,58 +811,28 @@
     return { x: mx, y: my, sx: p.x + localX * S, sy: foot + localY * S };
   }
 
-  function tryAutoFire() {
+  function shoot() {
     const p = game.player;
-    let target = null;
-    let best = Infinity;
-
-    for (const e of game.enemies) {
-      if (e.dead || e.frozen) continue;
-      const dx = e.x - p.x;
-      if (dx < -20 || dx > W * 0.92) continue;
-      const dist = Math.abs(dx) + Math.max(0, 180 - e.x) * 0.4;
-      if (dist < best) {
-        best = dist;
-        target = { obj: e, x: e.x, y: groundY - 31 * S, kind: "ground" };
-      }
-    }
-    for (const d of game.drones) {
-      if (d.dead) continue;
-      const dist = Math.hypot(d.x - p.x, d.y - (groundY - 38 * S)) * 0.88 - (d.state === "dive" ? 120 : 0);
-      if (dist < best) {
-        best = dist;
-        target = { obj: d, x: d.x, y: d.y, kind: "drone" };
-      }
-    }
-
-    if (!target) {
-      p.fireCd = 0.1;
-      return;
-    }
-
-    p.fireCd = rand(0.23, 0.3);
-    p.muzzle = 0.075;
+    if (!p || p.hidden || (game.state !== "playing" && game.state !== "extraction")) return;
+    if (p.shootCd > 0) return;
+    p.shootCd = 0.2;
+    p.muzzle = 0.08;
+    p.aim = 0;
     const m = playerMuzzle();
-    p.aim = clamp(Math.atan2(target.y - m.sy, target.x - m.sx), -1.35, 0.55);
-    const muzzle = playerMuzzle();
     game.tracers.push({
-      x1: muzzle.x, y1: muzzle.y, x2: target.x + rand(-4, 4), y2: target.y + rand(-3, 3),
-      life: 0.075, max: 0.075, width: rand(1, 1.7), color: "255,238,178", trail: 0.46,
+      x1: m.x, y1: m.y, x2: m.x + 180 * S, y2: m.y,
+      life: 0.06, max: 0.06, width: rand(1, 1.6), color: "255,238,178", trail: 1,
     });
-    target.obj.hp -= 1;
-    target.obj.hitFlash = 0.1;
-    spawnHitSparks(target.x, target.y, target.kind === "drone" ? "190,215,230" : "255,200,120", 5);
+    game.bullets.push({
+      x: m.x, y: m.y, vx: 820, vy: 0,
+      life: 1.1, max: 1.1, radius: 3.2, color: "255,232,160", kind: "player",
+    });
     addParticle({
-      type: "ember", x: muzzle.sx, y: muzzle.sy,
-      vx: rand(-20, 45), vy: rand(-95, -35), size: 1.5,
-      life: rand(0.35, 0.7), color: "255,196,90", gravity: 620, drag: 0.3,
+      type: "ember", x: m.sx, y: m.sy,
+      vx: rand(20, 70), vy: rand(-80, -30), size: 1.5,
+      life: rand(0.25, 0.55), color: "255,196,90", gravity: 620, drag: 0.3,
     });
     audio.shot();
-
-    if (target.obj.hp <= 0) {
-      if (target.kind === "ground") killGroundEnemy(target.obj, "rifle");
-      else killDrone(target.obj, "rifle");
-    }
   }
 
   // ---------- enemy updates ----------
@@ -1019,11 +1034,40 @@
         game.bullets.splice(i, 1);
         continue;
       }
-      const px = p.x;
-      const py = groundY + p.yOffset - 31 * S;
-      if (Math.hypot(b.x - px, b.y - py) < (18 + b.radius) * S) {
-        if (damagePlayer(b.kind === "drone" ? 8 : 7, b.x, b.y)) {
-          game.bullets.splice(i, 1);
+      if (b.kind === "player") {
+        let hit = false;
+        for (const e of game.enemies) {
+          if (e.dead) continue;
+          if (Math.hypot(b.x - e.x, b.y - (groundY - 31 * S)) < (16 + b.radius) * S) {
+            e.hp -= 1;
+            e.hitFlash = 0.1;
+            spawnHitSparks(e.x, groundY - 28 * S, "255,200,120", 5);
+            if (e.hp <= 0) killGroundEnemy(e, "rifle");
+            hit = true;
+            break;
+          }
+        }
+        if (!hit) {
+          for (const d of game.drones) {
+            if (d.dead) continue;
+            if (Math.hypot(b.x - d.x, b.y - d.y) < (20 + b.radius) * S) {
+              d.hp -= 1;
+              d.hitFlash = 0.1;
+              spawnHitSparks(d.x, d.y, "190,215,230", 5);
+              if (d.hp <= 0) killDrone(d, "rifle");
+              hit = true;
+              break;
+            }
+          }
+        }
+        if (hit) game.bullets.splice(i, 1);
+      } else {
+        const px = p.x;
+        const py = groundY + p.yOffset - 31 * S;
+        if (Math.hypot(b.x - px, b.y - py) < (18 + b.radius) * S) {
+          if (damagePlayer(b.kind === "drone" ? 8 : 7, b.x, b.y)) {
+            game.bullets.splice(i, 1);
+          }
         }
       }
     }
@@ -1032,7 +1076,7 @@
   // ---------- damage & deaths ----------
   function damagePlayer(amount, x, y) {
     const p = game.player;
-    if (!p || p.invuln > 0 || p.dodge > 0 || game.state !== "playing") return false;
+    if (!p || p.invuln > 0 || game.state !== "playing") return false;
     game.health = Math.max(0, game.health - amount);
     p.invuln = 0.82;
     game.shake = Math.min(24, game.shake + 7);
@@ -1498,8 +1542,6 @@
       game.gameTime += dt;
       const progress = clamp(1 - game.distance / 5000, 0, 1);
       game.speed = 252 + progress * 54;
-      game.scroll += game.speed * dt;
-      game.distance = Math.max(0, game.distance - (58 + progress * 10) * dt);
       updateCooldowns(dt);
       updatePlayer(dt);
       updateSpawns(dt);
@@ -1570,6 +1612,11 @@
     game.menuDrone.x = W * 0.82;
     game.menuDrone.y = H * 0.24;
     initAsh();
+    if (game.state === "menu" && game.player) {
+      menuBackdrop = null;
+      buildMenuBackdrop();
+      canvas.style.display = "none";
+    }
   }
 
   window.addEventListener("resize", resize, { passive: true });
@@ -3218,26 +3265,12 @@
     ctx.fill();
     ctx.restore();
 
-    const flicker = p.invuln > 0 && p.dodge <= 0 ? 0.62 + Math.abs(Math.sin(game.menuTime * 44)) * 0.38 : 1;
-
-    if (p.dodge > 0) {
-      const ghostOpts = {
-        run: p.run, moving: true, air: !p.grounded, dodge: p.dodge,
-        aim: p.aim, muzzle: 0,
-      };
-      ctx.save();
-      ctx.globalAlpha = 0.1 * flicker;
-      drawSoldier(p.x - 15 * S, foot, ghostOpts);
-      ctx.globalAlpha = 0.06 * flicker;
-      drawSoldier(p.x - 29 * S, foot, ghostOpts);
-      ctx.restore();
-    }
+    const flicker = p.invuln > 0 ? 0.62 + Math.abs(Math.sin(game.menuTime * 44)) * 0.38 : 1;
 
     drawSoldier(p.x, foot, {
       run: p.run,
-      moving: p.grounded || game.state === "extraction",
+      moving: p.moving || game.state === "extraction",
       air: !p.grounded,
-      dodge: p.dodge,
       muzzle: p.muzzle,
       aim: p.aim,
       dead: p.dead,
@@ -3391,11 +3424,18 @@
     drawGround();
     drawBattlefieldProps();
     drawForegroundDetails();
+    drawMenuScene();
+    drawAsh();
     const c = document.createElement("canvas");
     c.width = canvas.width;
     c.height = canvas.height;
     c.getContext("2d").drawImage(canvas, 0, 0);
     menuBackdrop = c;
+    try {
+      startScreen.style.backgroundImage = `url(${c.toDataURL("image/jpeg", 0.82)})`;
+      startScreen.style.backgroundSize = "cover";
+      startScreen.style.backgroundPosition = "center";
+    } catch (e) {}
   }
 
   function drawScreenFlash() {
@@ -3458,6 +3498,7 @@
       beginExtraction,
       showVictory,
       useAbility,
+      shoot,
       spawnGroundEnemy,
       spawnDrone,
     };
@@ -3484,6 +3525,7 @@
   game.menuDrone.x = W * 0.82;
   game.menuDrone.y = H * 0.24;
   buildMenuBackdrop();
+  canvas.style.display = "none";
   updateHud();
   updateSoundButton();
   requestAnimationFrame(loop);

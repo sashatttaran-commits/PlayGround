@@ -84,6 +84,20 @@
 
       <div class="bottom-ui">
         <div class="movement" aria-label="Movement controls">
+          <button id="leftBtn" class="move-btn left" type="button" aria-label="Move left">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M30 10 14 24l16 14" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>LEFT</span>
+            <kbd>A</kbd>
+          </button>
+          <button id="rightBtn" class="move-btn right" type="button" aria-label="Move right">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M18 10 34 24 18 38" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>RIGHT</span>
+            <kbd>D</kbd>
+          </button>
           <button id="jumpBtn" class="move-btn jump" type="button" aria-label="Jump">
             <svg viewBox="0 0 48 48" aria-hidden="true">
               <path d="M24 38V14M14 24l10-10 10 10" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -92,17 +106,21 @@
             <span>JUMP</span>
             <kbd>SPACE</kbd>
           </button>
-          <button id="dodgeBtn" class="move-btn dodge" type="button" aria-label="Dodge">
-            <svg viewBox="0 0 48 48" aria-hidden="true">
-              <path d="M9 27h18l7-8M13 34h20l8-8M15 20l7-7" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M34 15h7v7" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span>DODGE</span>
-            <kbd>SHIFT</kbd>
-          </button>
         </div>
 
-        <div class="abilities" aria-label="Abilities">
+        <div class="abilities" aria-label="Combat controls">
+          <button id="shootBtn" class="ability shoot" type="button" data-ability="shoot" aria-label="Shoot rifle">
+            <span class="ability-key">F</span>
+            <span class="ability-icon">
+              <svg viewBox="0 0 40 40" aria-hidden="true">
+                <path d="M6 20h20M20 14l8 6-8 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span class="ability-name">SHOOT</span>
+            <span class="ability-sub">RIFLE</span>
+            <span class="ability-timer"></span>
+            <span class="cool" aria-hidden="true"></span>
+          </button>
           <button id="rebBtn" class="ability reb" type="button" data-ability="reb" aria-label="REB electronic warfare jammer">
             <span class="ability-key">1</span>
             <span class="ability-icon">
