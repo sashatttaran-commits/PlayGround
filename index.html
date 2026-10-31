@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#070b0c" />
+  <meta name="description" content="Steel Corridor — a touch-first 2D battlefield survival runner. Cross 5 km to the Novator extraction." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 3 56 12v18c0 14-10 25-24 31C18 55 8 44 8 30V12Z' fill='%23070b0c' stroke='%23ffd23f' stroke-width='4'/%3E%3Cpath d='M22 20h20v6H22zm0 10h20v6H22zm7 10h6v9h-6z' fill='%233b83ff'/%3E%3C/svg%3E" />
+  <title>Steel Corridor — 5 KM to Novator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <canvas id="game" aria-label="Steel Corridor battlefield"></canvas>
+    <div class="fx fx-grain" aria-hidden="true"></div>
+    <div class="fx fx-vignette" aria-hidden="true"></div>
+    <div id="damageFx" class="fx fx-damage" aria-hidden="true"></div>
+
+    <div id="hud" class="hud" aria-live="off">
+      <header class="topbar">
+        <section class="health-panel panel" aria-label="Player health">
+          <div class="callsign">
+            <span class="live-dot"></span>
+            <span>SGT. KOVAL</span>
+            <span class="auto-chip">AUTO-RUN</span>
+          </div>
+          <div class="health-line">
+            <svg class="health-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 20s-7.2-4.6-7.2-10.1A4.3 4.3 0 0 1 12 6.6a4.3 4.3 0 0 1 7.2 3.3C19.2 15.4 12 20 12 20Z" fill="currentColor"/>
+              <path d="M8.2 12.1h2.2l1-2.2 1.5 4.2 1-2h2" fill="none" stroke="#08100d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="health-track" role="progressbar" aria-label="Health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" id="healthBar">
+              <div id="healthFill" class="health-fill"></div>
+              <div class="health-ticks" aria-hidden="true"></div>
+            </div>
+            <span id="healthNum" class="health-num">100</span>
+          </div>
+        </section>
+
+        <section class="mission-panel panel" aria-label="Distance to extraction">
+          <div class="mission-head">
+            <span>EXTRACTION ROUTE</span>
+            <span id="missionStatus" class="mission-status">IN TRANSIT</span>
+          </div>
+          <div class="distance-row">
+            <span id="distanceNum" class="distance-num">5,000</span>
+            <span class="distance-unit">M</span>
+            <span class="distance-caption">TO NOVATOR</span>
+          </div>
+          <div class="route-track" aria-hidden="true">
+            <div id="routeFill" class="route-fill"></div>
+            <div id="routeMarker" class="route-marker">
+              <svg viewBox="0 0 12 16"><path d="M1 1h10v9l-5 5-5-5Z" fill="currentColor"/></svg>
+            </div>
+            <i class="route-tick t1"></i><i class="route-tick t2"></i><i class="route-tick t3"></i>
+          </div>
+          <div class="route-labels"><span>START</span><span>2.5 KM</span><span>EXTRACT</span></div>
+        </section>
+
+        <section class="status-panel">
+          <div class="kills-panel panel" aria-label="Enemy kills">
+            <span id="killsNum">0</span>
+            <small>KILLS</small>
+          </div>
+          <button id="soundBtn" class="icon-btn" type="button" aria-label="Mute audio" title="Mute audio (M)">
+            <svg class="sound-on" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9h4l5-4v14l-5-4H4Z" fill="currentColor"/>
+              <path d="M16 8.2a5.3 5.3 0 0 1 0 7.6M18.7 5.6a8.8 8.8 0 0 1 0 12.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+            <svg class="sound-off" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9h4l5-4v14l-5-4H4Z" fill="currentColor"/>
+              <path d="m16.5 9.5 5 5m0-5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </section>
+      </header>
+
+      <div id="objective" class="objective hidden" role="status">
+        <span class="obj-kicker">OBJECTIVE</span>
+        <span id="objectiveText">REACH THE EXTRACTION POINT</span>
+      </div>
+
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+      <div class="bottom-ui">
+        <div class="movement" aria-label="Movement controls">
+          <button id="jumpBtn" class="move-btn jump" type="button" aria-label="Jump">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M24 38V14M14 24l10-10 10 10" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M11 41h26" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".45"/>
+            </svg>
+            <span>JUMP</span>
+            <kbd>SPACE</kbd>
+          </button>
+          <button id="dodgeBtn" class="move-btn dodge" type="button" aria-label="Dodge">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M9 27h18l7-8M13 34h20l8-8M15 20l7-7" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M34 15h7v7" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>DODGE</span>
+            <kbd>SHIFT</kbd>
+          </button>
+        </div>
+
+        <div class="abilities" aria-label="Abilities">
+          <button id="rebBtn" class="ability reb" type="button" data-ability="reb" aria-label="REB electronic warfare jammer">
+            <span class="ability-key">1</span>
+            <span class="ability-icon">
+              <svg viewBox="0 0 40 40" aria-hidden="true">
+                <path d="M20 35V17M13 35h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+                <path d="M20 18 12 10M20 18l8-8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+                <circle cx="20" cy="18" r="2.7" fill="currentColor"/>
+                <path d="M8 7a14.5 14.5 0 0 0 0 20M32 7a14.5 14.5 0 0 1 0 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".75"/>
+              </svg>
+            </span>
+            <span class="ability-name">REB</span>
+            <span class="ability-sub">JAMMER</span>
+            <span class="ability-timer"></span>
+            <span class="cool" aria-hidden="true"></span>
+          </button>
+
+          <button id="radioBtn" class="ability radio" type="button" data-ability="radio" aria-label="Radio friendly FPV drone strike">
+            <span class="ability-key">2</span>
+            <span class="ability-icon">
+              <svg viewBox="0 0 40 40" aria-hidden="true">
+                <path d="M11 14h18v11H11z" fill="none" stroke="currentColor" stroke-width="2.2"/>
+                <path d="m8 14 12-6 12 6M15 25v5M25 25v5M13 30h6M22 30h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M20 7V2M16 4h8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                <path d="m20 17 3 4-3 4-3-4Z" fill="currentColor"/>
+              </svg>
+            </span>
+            <span class="ability-name">RADIO</span>
+            <span class="ability-sub">FPV STRIKE</span>
+            <span class="ability-timer"></span>
+            <span class="cool" aria-hidden="true"></span>
+          </button>
+
+          <button id="medBtn" class="ability med" type="button" data-ability="med" aria-label="Medkit heal">
+            <span class="ability-key">3</span>
+            <span class="ability-icon">
+              <svg viewBox="0 0 40 40" aria-hidden="true">
+                <rect x="7" y="12" width="26" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="2.4"/>
+                <path d="M15 12V8h10v4M20 17v10M15 22h10" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="ability-name">MEDKIT</span>
+            <span class="ability-sub">+40 HP</span>
+            <span class="ability-timer"></span>
+            <span class="cool" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <section id="startScreen" class="screen start-screen">
+      <div class="start-wash"></div>
+      <div class="start-content">
+        <div class="eyebrow"><span class="live-dot"></span> TASK GROUP EAST <span class="eyebrow-sep">//</span> SECTOR 7</div>
+        <h1 class="game-title">STEEL<br /><span>CORRIDOR</span></h1>
+        <p class="tagline">Five kilometres behind the line. One extraction window. Run it.</p>
+
+        <div class="mission-strip">
+          <div><b>5,000 M</b><span>TO EXTRACTION</span></div>
+          <div><b>∞</b><span>ENEMY CONTACTS</span></div>
+          <div><b>NOVATOR</b><span>EXTRACTION APC</span></div>
+        </div>
+
+        <div class="loadout" aria-label="Field loadout">
+          <div class="loadout-item reb">
+            <span class="loadout-icon">
+              <svg viewBox="0 0 40 40" aria-hidden="true">
+                <path d="M20 35V17M13 35h14M20 18 12 10M20 18l8-8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+                <circle cx="20" cy="18" r="2.7" fill="currentColor"/>
+                <path d="M8 7a14.5 14.5 0 0 0 0 20M32 7a14.5 14.5 0 0 1 0 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".75"/>
+              </svg>
+            </span>
+            <span><b>REB</b><small>Drone jammer</small></span>
+          </div>
+          <div class="loadout-item radio">
+            <span class="loadout-icon">
+              <svg viewBox="0 0 40 40" aria-hidden="true">
+                <path d="M11 14h18v11H11z" fill="none" stroke="currentColor" stroke-width="2.2"/>
+                <path d="m8 14 12-6 12 6M15 25v5M25 25v5M13 30h6M22 30h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="m20 17 3 4-3 4-3-4Z" fill="currentColor"/>
+              </svg>
+            </span>
+            <span><b>RADIO</b><small>FPV strike</small></span>
+          </div>
+          <div class="loadout-item med">
+            <span class="loadout-icon">
+              <svg viewBox="0 0 40 40" aria-hidden="true">
+                <rect x="7" y="12" width="26" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="2.4"/>
+                <path d="M15 12V8h10v4M20 17v10M15 22h10" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span><b>MEDKIT</b><small>Restore 40 HP</small></span>
+          </div>
+        </div>
+
+        <button id="playBtn" class="primary" type="button" aria-label="Play">
+          <span class="play-glyph" aria-hidden="true">▶</span>
+          <span class="play-label">PLAY</span>
+          <span class="play-sub">AUTO-RUN · TOUCH READY</span>
+        </button>
+        <p class="start-foot">SPACE / TAP TO JUMP &nbsp;·&nbsp; SHIFT / TAP TO DODGE &nbsp;·&nbsp; 1–3 ABILITIES</p>
+      </div>
+      <div class="start-rail" aria-hidden="true">
+        <span>49.0° N</span><i></i><span>37.8° E</span><i></i><span>05 KM</span>
+      </div>
+      <div class="flag-stripe" aria-hidden="true"><span></span><span></span></div>
+    </section>
+
+    <section id="victoryScreen" class="screen end-screen victory-screen hidden" aria-hidden="true">
+      <div class="end-wash"></div>
+      <div class="end-card">
+        <div class="end-kicker"><span class="live-dot"></span> EXTRACTION CONFIRMED</div>
+        <h2>MISSION<br /><span>COMPLETE</span></h2>
+        <p class="end-copy">The Novator punched through. Your team is aboard and rolling out of the corridor.</p>
+        <div class="end-stats">
+          <div><span id="vDistance">5,000</span><small>METRES CROSSED</small></div>
+          <div><span id="vKills">0</span><small>HOSTILES DOWN</small></div>
+          <div><span id="vHealth">100</span><small>HP REMAINING</small></div>
+          <div><span id="vTime">0:00</span><small>MISSION TIME</small></div>
+        </div>
+        <div class="end-actions">
+          <button id="replayBtn" class="primary compact" type="button" aria-label="Play again"><span class="play-label">RUN AGAIN</span></button>
+          <span class="end-note">NOVATOR // EXTRACTION APC</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="deathScreen" class="screen end-screen death-screen hidden" aria-hidden="true">
+      <div class="end-wash"></div>
+      <div class="end-card">
+        <div class="end-kicker danger"><span class="live-dot"></span> SIGNAL LOST</div>
+        <h2>MISSION<br /><span>FAILED</span></h2>
+        <p class="end-copy">The corridor held. You didn't. The extraction window is still open.</p>
+        <div class="end-stats">
+          <div><span id="dDistance">0</span><small>METRES CROSSED</small></div>
+          <div><span id="dKills">0</span><small>HOSTILES DOWN</small></div>
+          <div><span id="dTime">0:00</span><small>SURVIVED</small></div>
+        </div>
+        <div class="end-actions">
+          <button id="retryBtn" class="primary compact" type="button" aria-label="Play again"><span class="play-label">TRY AGAIN</span></button>
+          <span class="end-note">RE-ENTER THE CORRIDOR</span>
+        </div>
+      </div>
+    </section>
+
+    <noscript><div class="noscript">This mission requires JavaScript.</div></noscript>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
